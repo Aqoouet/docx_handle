@@ -5,6 +5,7 @@ SHARED_ROOT="${1:-/filer/users/rymax1e/docx_handle/test_data}"
 INPUT_NAME="${2:-test_preprocessed.docx}"
 REPORT_CHECKING_ROOT="${3:-/home/rymax1e/report_checking}"
 CONTAINER="${4:-report-checker-docling}"
+DOCX_HANDLE_ROOT="${5:-/filer/users/rymax1e/docx_handle}"
 
 INPUT_PATH="$SHARED_ROOT/$INPUT_NAME"
 OUTPUT_PATH="${INPUT_PATH%.docx}.md"
@@ -25,7 +26,7 @@ fi
 
 echo "[remote] converting $INPUT_PATH -> $OUTPUT_PATH"
 cd "$REPORT_CHECKING_ROOT"
-DOCLING_URL="http://$DOCLING_IP:5001" "$PYTHON" - <<EOF
+DOCLING_URL="http://$DOCLING_IP:5001" PYTHONPATH="$DOCX_HANDLE_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" - <<EOF
 from pathlib import Path
 from backend.app.docling_client import convert_file_to_md
 from docx_handle.formula_normalizer import fix_docling_latex
