@@ -21,6 +21,10 @@ MAX_HIDDEN_DELETES_PER_RANGE = 1000
 KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
 KNOWN_CROSS_REFERENCE_TYPES = {3, 37, 72}
 
+# Hidden runs that start with these prefixes in cross-reference results should be
+# made visible rather than deleted.  The trailing space is intentional.
+CROSS_REFERENCE_VISIBLE_PREFIXES = ("Таблица ", "Рисунок ")
+
 
 class DocumentEngine(Protocol):
     def process(self, input_path: Path, output_path: Path) -> None:
@@ -121,6 +125,72 @@ def remove_hidden_text_from_ranges(ranges: Iterable[Any]) -> int:
     return cleaned
 
 
+def _unhide_prefix_in_range(word_range: Any, prefix: str) -> int:
+    """Find hidden runs of *prefix* in *word_range* and clear their hidden formatting.
+
+    Uses the same Find-loop pattern as :func:`remove_hidden_text_from_ranges` but
+    sets ``Font.Hidden = False`` on each match instead of deleting it.
+    """
+    search_range = getattr(word_range, "Duplicate", word_range)
+    _set_include_hidden_text(search_range, True)
+    find = getattr(search_range, "Find", None)
+    if find is None:
+        return 0
+
+    _safe_call(find, "ClearFormatting")
+    _safe_set(find, "Text", prefix)
+    _safe_set(find, "Forward", True)
+    _safe_set(find, "Wrap", WD_FIND_STOP)
+    _safe_set(find, "Format", True)
+    _safe_set(find, "MatchCase", True)
+    _safe_set(find, "MatchWholeWord", False)
+    _safe_set(find, "MatchWildcards", False)
+    _safe_set(find, "MatchSoundsLike", False)
+    _safe_set(find, "MatchAllWordForms", False)
+
+    font = getattr(find, "Font", None)
+    if font is not None:
+        _safe_set(font, "Hidden", True)
+
+    count = 0
+    execute_fn = getattr(find, "Execute", None)
+    if not callable(execute_fn):
+        return 0
+    while count < MAX_HIDDEN_DELETES_PER_RANGE:
+        if not execute_fn():
+            break
+        found_font = getattr(search_range, "Font", None)
+        if found_font is not None:
+            _safe_set(found_font, "Hidden", False)
+        count += 1
+    return count
+
+
+def unhide_table_figure_prefixes_in_cross_reference_results(document: Any) -> int:
+    """Unhide hidden 'Таблица ' and 'Рисунок ' prefixes in cross-reference field results.
+
+    For every cross-reference field in every story, if the result range contains
+    a run whose text matches one of :data:`CROSS_REFERENCE_VISIBLE_PREFIXES` and
+    that run carries ``Font.Hidden = True``, the hidden formatting is removed so
+    the prefix becomes visible in the rendered document.
+    """
+    total = 0
+    for fields in iter_story_field_collections(document):
+        count = getattr(fields, "Count", 0)
+        if not isinstance(count, int):
+            continue
+        for index in range(count, 0, -1):
+            field = fields[index]
+            if not is_cross_reference_field(field):
+                continue
+            result_range = getattr(field, "Result", None)
+            if result_range is None:
+                continue
+            for prefix in CROSS_REFERENCE_VISIBLE_PREFIXES:
+                total += _unhide_prefix_in_range(result_range, prefix)
+    return total
+
+
 def iter_cross_reference_fields(fields: Iterable[Any]) -> Iterable[Any]:
     for field in fields:
         if is_cross_reference_field(field):
@@ -183,10 +253,14 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 
 
 def clean_document(document: Any) -> dict[str, int]:
-    hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
+    # Unhide "Таблица " / "Рисунок " prefixes first so the subsequent delete pass
+    # leaves them intact.
+    unhide_count = unhide_table_figure_prefixes_in_cross_reference_results(document)
     cross_reference_hidden_text_count = remove_hidden_text_from_cross_reference_results(document)
+    hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
     return {
         "cross_reference_fields_unlinked": 0,
+        "cross_reference_prefixes_unhidden": unhide_count,
         "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
         "cross_reference_results_rewritten": 0,
         "ranges_scanned_for_hidden_text": hidden_text_count,
