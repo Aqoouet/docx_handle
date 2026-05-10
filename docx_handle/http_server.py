@@ -5,6 +5,7 @@ from email.parser import BytesParser
 from email.policy import default
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from .errors import BadRequestError, DocumentProcessingError, WordAutomationUnav
 from .word_service import SingleWorkerDocxService, default_engine_factory
 
 DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+logger = logging.getLogger(__name__)
 
 
 class DocxHandleHTTPServer(ThreadingHTTPServer):
@@ -42,6 +44,7 @@ class DocxHandleRequestHandler(BaseHTTPRequestHandler):
 
         try:
             payload = self._read_upload()
+            logger.info("http: convert requested filename=%s bytes=%d", payload["filename"], len(payload["content"]))
             output = self.processor.process_bytes(payload["filename"], payload["content"])
         except BadRequestError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"detail": str(exc)})
@@ -63,6 +66,7 @@ class DocxHandleRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(output)))
         self.end_headers()
         self.wfile.write(output)
+        logger.info("http: convert finished filename=%s output_bytes=%d", payload["filename"], len(output))
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
         return

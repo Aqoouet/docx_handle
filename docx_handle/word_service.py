@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import queue
+import logging
 import sys
 import threading
 import tempfile
@@ -12,6 +13,8 @@ from typing import Any, Callable, Iterable, Protocol
 
 from .errors import DocumentProcessingError, WordAutomationUnavailableError
 from .formula_normalizer import normalize_docx_math_cyrillic
+
+logger = logging.getLogger(__name__)
 
 WD_FIND_STOP = 0
 WD_REPLACE_ALL = 2
@@ -176,16 +179,19 @@ class SingleWorkerDocxService:
     def process_bytes(self, filename: str, content: bytes) -> bytes:
         self.start()
         suffix = _safe_suffix(filename)
+        logger.info("queue: accepted %s (%d bytes)", filename, len(content))
         with tempfile.TemporaryDirectory(prefix="docx-handle-") as temp_dir:
             temp_root = Path(temp_dir)
             input_path = temp_root / f"input{suffix}"
             output_path = temp_root / "output.docx"
             input_path.write_bytes(content)
             job = _Job(input_path=input_path, output_path=output_path)
+            logger.info("queue: waiting for worker on %s", input_path.name)
             self._jobs.put(job)
             job.done.wait()
             if job.error is not None:
                 raise job.error
+            logger.info("queue: finished %s", filename)
             return output_path.read_bytes()
 
     def _worker_loop(self) -> None:
@@ -205,7 +211,9 @@ class SingleWorkerDocxService:
             try:
                 if job.is_sentinel:
                     return
+                logger.info("worker: starting %s -> %s", job.input_path.name, job.output_path.name)
                 engine.process(job.input_path, job.output_path)
+                logger.info("worker: completed %s", job.output_path.name)
             except BaseException as exc:  # noqa: BLE001 - propagate any failure to the caller
                 job.error = exc
                 traceback.print_exception(exc, file=sys.stderr)
@@ -259,6 +267,7 @@ def default_engine_factory() -> DocumentEngine:
             document = None
             saved = False
             try:
+                logger.info("word: creating Word.Application")
                 for creator in (
                     getattr(win32com.client, "GetActiveObject", None),
                     getattr(win32com.client, "Dispatch", None),
@@ -283,13 +292,20 @@ def default_engine_factory() -> DocumentEngine:
                 except Exception:
                     pass
 
+                logger.info("word: opening %s", input_path)
                 document = app.Documents.Open(
                     FileName=str(input_path),
                     ReadOnly=False,
                     AddToRecentFiles=False,
                     ConfirmConversions=False,
                 )
-                clean_document(document)
+                cleanup_stats = clean_document(document)
+                logger.info(
+                    "word: cleanup complete cross_refs=%d hidden_ranges=%d",
+                    cleanup_stats["cross_reference_fields_unlinked"],
+                    cleanup_stats["ranges_scanned_for_hidden_text"],
+                )
+                logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
                 saved = True
             except Exception as exc:  # pragma: no cover - exercised on Windows host
@@ -309,7 +325,9 @@ def default_engine_factory() -> DocumentEngine:
 
             if saved:
                 try:
+                    logger.info("word: normalizing math text in %s", output_path.name)
                     normalize_docx_math_cyrillic(output_path)
+                    logger.info("word: normalization complete for %s", output_path.name)
                 except Exception as exc:  # pragma: no cover - exercised on Windows host
                     raise DocumentProcessingError("Word failed while normalizing formula text.") from exc
 
