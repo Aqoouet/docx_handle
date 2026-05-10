@@ -63,11 +63,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000 " ^| findstr "LISTENIN
 call :log "Starting docx_handle on 0.0.0.0:8000"
 
 cd /d "%ROOT_DIR%"
-set "CYR_FLAG="
-if /i "%DOCX_HANDLE_NO_CYR_FIX%"=="1" set "CYR_FLAG=--no-cyr-fix"
-if /i "%DOCX_HANDLE_NO_CYR_FIX%"=="true" set "CYR_FLAG=--no-cyr-fix"
-if defined CYR_FLAG call :log "Cyrillic fix DISABLED (DOCX_HANDLE_NO_CYR_FIX=%DOCX_HANDLE_NO_CYR_FIX%)"
-call "%ROOT_DIR%\.venv\Scripts\python.exe" -u -m docx_handle.cli --host 0.0.0.0 --port 8000 %CYR_FLAG% >> "%LOG_FILE%" 2>&1
+call "%ROOT_DIR%\.venv\Scripts\python.exe" -u -m docx_handle.cli --host 0.0.0.0 --port 8000 >> "%LOG_FILE%" 2>&1
 set "EXIT_CODE=%ERRORLEVEL%"
 call :log "Service exited with code %EXIT_CODE%"
 exit /b %EXIT_CODE%

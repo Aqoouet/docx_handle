@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import BadRequestError, DocumentProcessingError, WordAutomationUnavailableError
-from .word_service import SingleWorkerDocxService, build_processor as _build_processor
+from .word_service import SingleWorkerDocxService, build_processor
 
 DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 logger = logging.getLogger(__name__)
@@ -122,8 +122,8 @@ class DocxHandleRequestHandler(BaseHTTPRequestHandler):
         return f"{stem}_updated.docx"
 
 
-def serve(host: str, port: int, processor: SingleWorkerDocxService | None = None, *, fix_cyr: bool = True) -> None:
-    processor = processor or _build_processor(fix_cyr=fix_cyr)
+def serve(host: str, port: int, processor: SingleWorkerDocxService | None = None) -> None:
+    processor = processor or build_processor()
     processor.start()
     server = DocxHandleHTTPServer((host, port), processor)
     try:

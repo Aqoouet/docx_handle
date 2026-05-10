@@ -29,7 +29,7 @@ cd "$REPORT_CHECKING_ROOT"
 DOCLING_URL="http://$DOCLING_IP:5001" PYTHONPATH="$DOCX_HANDLE_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" - <<EOF
 from pathlib import Path
 from backend.app.docling_client import convert_file_to_md
-from docx_handle.formula_normalizer import fix_docling_latex
+from postprocess.latex_fix import fix_docling_latex
 src = Path("$INPUT_PATH")
 out = Path("$OUTPUT_PATH")
 md = fix_docling_latex(convert_file_to_md(str(src)))

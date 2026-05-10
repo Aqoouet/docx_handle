@@ -77,7 +77,7 @@ def _remote_docling_convert(
     python_code = (
         "from pathlib import Path\n"
         "from backend.app.docling_client import convert_file_to_md\n"
-        "from docx_handle.formula_normalizer import fix_docling_latex\n"
+        "from postprocess.latex_fix import fix_docling_latex\n"
         f"src = Path({linux_input_path.as_posix()!r})\n"
         f"out = Path({linux_output_path.as_posix()!r})\n"
         "md = fix_docling_latex(convert_file_to_md(str(src)))\n"

@@ -44,7 +44,7 @@ Expected: `{"status": "ok"}`
 ### 5. Run preprocessing (sends DOCX to service, writes result to shared test_data)
 
 ```bash
-ssh stressii-wg "cd /filer/users/rymax1e/docx_handle && python scripts/remote_smoke_test.py"
+ssh stressii-wg "cd /filer/users/rymax1e/docx_handle && python scripts/run_full_test.py --service-host stress11 --skip-docling"
 ```
 
 ### 6. Run Docling conversion (shared test_data → Markdown)
@@ -54,6 +54,8 @@ ssh stressii-wg "cd /filer/users/rymax1e/docx_handle && ./scripts/remote_docling
 ```
 
 Output: `/filer/users/rymax1e/docx_handle/test_data/test_preprocessed.md`
+
+> Note: run steps 5 and 6 separately — `run_full_test.py` with `--ssh-host stressii-wg` does not work because `stressii-wg` cannot SSH to itself.
 
 ## Log locations
 
