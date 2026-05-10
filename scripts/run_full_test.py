@@ -51,6 +51,7 @@ def _ssh_capture(host: str, command: str) -> subprocess.CompletedProcess[str]:
 
 
 def _remote_docling_convert(
+    ssh_host: str,
     report_checking_root: str,
     linux_input_path: Path,
     linux_output_path: Path,
@@ -58,7 +59,7 @@ def _remote_docling_convert(
     ) -> None:
     print("[remote] resolving docling container IP")
     ip_proc = _ssh_capture(
-        "stressii-wg",
+        ssh_host,
         f"docker inspect {shlex.quote(docling_container_name)} --format '{{{{range.NetworkSettings.Networks}}}}{{{{.IPAddress}}}}{{{{end}}}}'",
     )
     if ip_proc.returncode != 0:
@@ -67,11 +68,11 @@ def _remote_docling_convert(
         if ip_proc.stderr.strip():
             print(ip_proc.stderr.rstrip(), file=sys.stderr)
         raise RuntimeError(
-            f"Failed to resolve Docling container IP on stressii-wg (exit {ip_proc.returncode})."
+            f"Failed to resolve Docling container IP on {ssh_host} (exit {ip_proc.returncode})."
         )
     docling_ip = ip_proc.stdout.strip()
     if not docling_ip:
-        raise RuntimeError("Could not resolve the Docling container IP on stressii-wg.")
+        raise RuntimeError(f"Could not resolve the Docling container IP on {ssh_host}.")
 
     python_code = (
         "from pathlib import Path\n"
@@ -91,13 +92,13 @@ def _remote_docling_convert(
     )
 
     print(f"[remote] converting via docling at {docling_ip}:5001")
-    proc = _ssh_capture("stressii-wg", remote_command)
+    proc = _ssh_capture(ssh_host, remote_command)
     if proc.stdout.strip():
         print(proc.stdout.rstrip())
     if proc.stderr.strip():
         print(proc.stderr.rstrip(), file=sys.stderr)
     if proc.returncode != 0:
-        raise RuntimeError(f"Docling conversion failed on stressii-wg (exit {proc.returncode}).")
+        raise RuntimeError(f"Docling conversion failed on {ssh_host} (exit {proc.returncode}).")
     print(f"[remote] wrote markdown: {linux_output_path}")
 
 
@@ -123,7 +124,12 @@ def main() -> int:
     parser.add_argument(
         "--docling-container-name",
         default="report-checker-docling",
-        help="Docling container name on stressii-wg.",
+        help="Docling container name on the remote SSH host.",
+    )
+    parser.add_argument(
+        "--ssh-host",
+        default="stressii-wg",
+        help="SSH host for the remote Docling conversion step (hostname or IP).",
     )
     args = parser.parse_args()
 
@@ -141,6 +147,7 @@ def main() -> int:
     linux_output = linux_root / markdown_path.name
 
     _remote_docling_convert(
+        args.ssh_host,
         args.report_checking_root,
         linux_input,
         linux_output,
