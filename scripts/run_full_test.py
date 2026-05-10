@@ -139,8 +139,6 @@ def main() -> int:
     linux_root = Path(args.linux_shared_root)
     linux_input = linux_root / preprocessed_path.name
     linux_output = linux_root / markdown_path.name
-    if not linux_input.exists():
-        raise FileNotFoundError(f"Preprocessed DOCX is not visible from stressii-wg shared path: {linux_input}")
 
     _remote_docling_convert(
         args.report_checking_root,
