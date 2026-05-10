@@ -53,6 +53,13 @@ if not exist "%ROOT_DIR%\logs" mkdir "%ROOT_DIR%\logs"
 set "LOG_FILE=%ROOT_DIR%\logs\service_share.log"
 
 call :log "Resolved ROOT_DIR=%ROOT_DIR%"
+
+call :log "Killing any existing docx_handle process on port 8000"
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+  call :log "Terminating PID %%P"
+  taskkill /PID %%P /F >nul 2>&1
+)
+
 call :log "Starting docx_handle on 0.0.0.0:8000"
 
 cd /d "%ROOT_DIR%"

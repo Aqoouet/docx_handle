@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778414859978,
+  "projectRoot": "/home/aqouet/Desktop/MRO/docx_handle",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "rtk read ~/.local/share/rtk/tee/1778418232_pytest.log",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "scripts",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "docx_handle": {
+      "path": "docx_handle",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778414859971,
+      "keyFiles": [
+        "__init__.py",
+        "cli.py",
+        "errors.py",
+        "formula_normalizer.py",
+        "http_server.py"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 10,
+      "lastAccessed": 1778414859972,
+      "keyFiles": [
+        "bootstrap_venv.py",
+        "debug_process.py",
+        "remote_smoke_test.py",
+        "run_debug.cmd",
+        "run_full_test.cmd"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 3,
+      "lastAccessed": 1778414859972,
+      "keyFiles": [
+        "test_formula_normalizer.py",
+        "test_http_server.py",
+        "test_word_service.py"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "scripts/run_full_test.py",
+      "accessCount": 13,
+      "lastAccessed": 1778418451325,
+      "type": "file"
+    },
+    {
+      "path": "docx_handle/formula_normalizer.py",
+      "accessCount": 5,
+      "lastAccessed": 1778418165030,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_formula_normalizer.py",
+      "accessCount": 4,
+      "lastAccessed": 1778418216204,
+      "type": "file"
+    },
+    {
+      "path": "scripts/run_full_test.cmd",
+      "accessCount": 3,
+      "lastAccessed": 1778418458320,
+      "type": "file"
+    },
+    {
+      "path": "scripts/remote_docling_convert.sh",
+      "accessCount": 2,
+      "lastAccessed": 1778418174239,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1778415330393,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1778417010198,
+      "type": "file"
+    },
+    {
+      "path": "docx_handle/http_server.py",
+      "accessCount": 1,
+      "lastAccessed": 1778417014436,
+      "type": "file"
+    },
+    {
+      "path": "docx_handle/word_service.py",
+      "accessCount": 1,
+      "lastAccessed": 1778417019650,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_word_service.py",
+      "accessCount": 1,
+      "lastAccessed": 1778417022822,
+      "type": "file"
+    },
+    {
+      "path": "docx_handle/errors.py",
+      "accessCount": 1,
+      "lastAccessed": 1778417026107,
+      "type": "file"
+    },
+    {
+      "path": "docx_handle/cli.py",
+      "accessCount": 1,
+      "lastAccessed": 1778417026332,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
