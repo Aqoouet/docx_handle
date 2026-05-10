@@ -187,17 +187,22 @@ def normalize_cross_reference_results(fields: Iterable[Any]) -> tuple[int, int, 
     for field in fields:
         result_range = getattr(field, "Result", None)
         if result_range is None:
+            field.Unlink()
+            _mark_internal(field, "_docx_handle_unlinked", True)
+            unlinked += 1
             continue
 
         scanned += 1
         visible_text = _range_text(result_range, include_hidden=False)
         full_text = _range_text(result_range, include_hidden=True)
-        if visible_text == full_text:
-            continue
 
         field.Unlink()
         _mark_internal(field, "_docx_handle_unlinked", True)
         unlinked += 1
+
+        if visible_text == full_text:
+            continue
+
         _replace_range_text(result_range, visible_text)
         rewritten += 1
     return scanned, rewritten, unlinked
@@ -230,10 +235,9 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 def clean_document(document: Any) -> dict[str, int]:
     fields = collect_cross_reference_fields(document)
     hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
-    cross_reference_hidden_text_count, cross_reference_rewritten_count, normalized_unlinked_count = (
+    cross_reference_hidden_text_count, cross_reference_rewritten_count, cross_reference_count = (
         normalize_cross_reference_results(fields)
     )
-    cross_reference_count = normalized_unlinked_count + unlink_cross_reference_fields(fields)
     return {
         "cross_reference_fields_unlinked": cross_reference_count,
         "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
