@@ -9,7 +9,6 @@ from docx_handle.word_service import (
     is_cross_reference_field,
     remove_hidden_text_from_cross_reference_results,
     remove_hidden_text_from_ranges,
-    unhide_table_figure_prefixes_in_cross_reference_results,
 )
 
 
@@ -58,12 +57,7 @@ class FakeFind:
     def Execute(self, **kwargs) -> bool:  # noqa: N802
         self.executed += 1
         self.execute_kwargs = kwargs
-        # Decrement here so the loop terminates regardless of whether the
-        # caller calls Delete() (delete path) or just unhides the found run.
-        if self._owner.hidden_matches_remaining > 0:
-            self._owner.hidden_matches_remaining -= 1
-            return True
-        return False
+        return self._owner.hidden_matches_remaining > 0
 
 
 class FakeRangeView:
@@ -91,6 +85,9 @@ class FakeRange:
         return FakeRangeView(self)
 
     def Delete(self) -> int:  # noqa: N802
+        if self.hidden_matches_remaining <= 0:
+            return 0
+        self.hidden_matches_remaining -= 1
         self.deleted_count += 1
         return 1
 
@@ -196,55 +193,12 @@ def test_clean_document_applies_story_and_cross_reference_cleanup_without_unlink
     result = clean_document(document)
 
     assert cleanup_range.deleted_count == 2
-    # The one hidden match in field_result was unhidden (not deleted) by the
-    # "Таблица "/"Рисунок " pass that runs before the delete pass.
-    assert field_result.deleted_count == 0
+    assert field_result.deleted_count == 1
     assert field.unlinked is False
     assert result["cross_reference_fields_unlinked"] == 0
-    assert result["cross_reference_prefixes_unhidden"] == 1
     assert result["cross_reference_results_scanned_for_hidden_text"] == 1
     assert result["cross_reference_results_rewritten"] == 0
     assert result["ranges_scanned_for_hidden_text"] == 2
-
-
-def test_unhide_table_figure_prefixes_unhides_hidden_runs_in_cross_reference_result():
-    result_range = FakeRange(hidden_matches_remaining=2)
-    field = FakeField("REF bookmark", result=result_range)
-    story_range = FakeRange(hidden_matches_remaining=0, fields=FakeFieldsCollection([field]))
-    document = FakeDocument([], [story_range])
-
-    count = unhide_table_figure_prefixes_in_cross_reference_results(document)
-
-    # Both matches were unhidden (first prefix consumed them both, second finds nothing).
-    assert count == 2
-    assert result_range.deleted_count == 0
-    # Find was configured to match hidden text with case sensitivity.
-    assert result_range.Find.Font.Hidden is True
-    assert result_range.Find.MatchCase is True
-
-
-def test_unhide_table_figure_prefixes_skips_non_cross_reference_fields():
-    result_range = FakeRange(hidden_matches_remaining=2)
-    field = FakeField("DATE", result=result_range)
-    story_range = FakeRange(hidden_matches_remaining=0, fields=FakeFieldsCollection([field]))
-    document = FakeDocument([], [story_range])
-
-    count = unhide_table_figure_prefixes_in_cross_reference_results(document)
-
-    assert count == 0
-    assert result_range.deleted_count == 0
-
-
-def test_unhide_table_figure_prefixes_does_not_delete_after_unhide():
-    """Unhiding must leave the text intact; delete_count must stay zero."""
-    result_range = FakeRange(hidden_matches_remaining=1)
-    field = FakeField("REF tbl", result=result_range)
-    story_range = FakeRange(hidden_matches_remaining=0, fields=FakeFieldsCollection([field]))
-    document = FakeDocument([], [story_range])
-
-    unhide_table_figure_prefixes_in_cross_reference_results(document)
-
-    assert result_range.deleted_count == 0
 
 
 class FakeEngine:
