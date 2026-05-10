@@ -4,15 +4,25 @@ setlocal EnableExtensions
 set "SHARE=\\e0-filer03\allcreatex\createx\rymax1e\storage"
 set "SERVICE_DIR=docx_handle"
 set "PREFERRED_DRIVE=%DOCX_HANDLE_DRIVE%"
+set "SHARE_USER=%DOCX_HANDLE_USER%"
 set "ROOT_DIR="
 
 if "%PREFERRED_DRIVE%"=="" set "PREFERRED_DRIVE=U"
+if "%SHARE_USER%"=="" set "SHARE_USER=rymax1e"
 set "PREFERRED_DRIVE=%PREFERRED_DRIVE::=%"
 
 call :try_drive %PREFERRED_DRIVE%
 if not defined ROOT_DIR (
   for %%D in (U V W X Y Z) do (
     if not defined ROOT_DIR call :try_drive %%D
+  )
+)
+
+if not defined ROOT_DIR (
+  pushd "%SHARE%\%SERVICE_DIR%" >nul 2>&1
+  if not errorlevel 1 (
+    set "ROOT_DIR=%CD%"
+    popd
   )
 )
 
@@ -39,7 +49,12 @@ if exist "%DRIVE%:\%SERVICE_DIR%\docx_handle\cli.py" (
   exit /b 0
 )
 
-net use %DRIVE%: "%SHARE%" /persistent:no >nul 2>&1
+if defined SHARE_USER (
+  net use %DRIVE%: "%SHARE%" /user:%SHARE_USER% * /persistent:no >nul 2>&1
+)
+if not defined SHARE_USER (
+  net use %DRIVE%: "%SHARE%" /persistent:no >nul 2>&1
+)
 if errorlevel 1 exit /b 0
 
 if exist "%DRIVE%:\%SERVICE_DIR%\docx_handle\cli.py" (

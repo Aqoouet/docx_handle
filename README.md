@@ -73,6 +73,7 @@ scripts\run_service_share.cmd
 ```
 
 The launcher will try the preferred drive letter first and then fall back to other free letters.
+If the share needs a password, `net use` will prompt for it interactively.
 
 ## Notes
 
