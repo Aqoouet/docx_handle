@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import os
 import queue
-import re
 import logging
 import sys
 import threading
 import tempfile
 import traceback
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
@@ -19,16 +17,6 @@ logger = logging.getLogger(__name__)
 
 WD_FIND_STOP = 0
 WD_REPLACE_ALL = 2
-WORDPROCESSINGML_PARTS = (
-    "word/document.xml",
-    "word/footnotes.xml",
-    "word/endnotes.xml",
-    "word/comments.xml",
-)
-HIDDEN_RUN_PATTERN = re.compile(
-    rb"<w:r\b[^>]*>.*?<w:rPr\b[^>]*>.*?<w:vanish\b(?:[^>]*/>|[^>]*>.*?</w:vanish>).*</w:rPr>.*?</w:r>",
-    re.DOTALL,
-)
 
 KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
 KNOWN_CROSS_REFERENCE_TYPES = {3, 37, 72}
@@ -175,47 +163,6 @@ def clean_document(document: Any) -> dict[str, int]:
         "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
         "ranges_scanned_for_hidden_text": hidden_text_count,
     }
-
-
-def _remove_hidden_runs_from_xml(xml_bytes: bytes) -> tuple[bytes, int]:
-    return HIDDEN_RUN_PATTERN.subn(b"", xml_bytes)
-
-
-def remove_hidden_runs_from_docx(docx_path: Path) -> int:
-    hidden_run_count = 0
-    temp_path = docx_path.with_suffix(f"{docx_path.suffix}.tmp")
-    try:
-        with zipfile.ZipFile(docx_path, "r") as source, zipfile.ZipFile(
-            temp_path, "w", compression=zipfile.ZIP_DEFLATED
-        ) as target:
-            for info in source.infolist():
-                payload = source.read(info.filename)
-                if info.filename in WORDPROCESSINGML_PARTS:
-                    payload, removed = _remove_hidden_runs_from_xml(payload)
-                    hidden_run_count += removed
-
-                clone = zipfile.ZipInfo(info.filename)
-                clone.date_time = info.date_time
-                clone.compress_type = zipfile.ZIP_DEFLATED
-                clone.comment = info.comment
-                clone.extra = info.extra
-                clone.internal_attr = info.internal_attr
-                clone.external_attr = info.external_attr
-                clone.create_system = info.create_system
-                clone.flag_bits = info.flag_bits
-                target.writestr(clone, payload)
-        temp_path.replace(docx_path)
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
-    return hidden_run_count
-
-
-def close_word_document(document: Any) -> None:
-    try:
-        document.Close(SaveChanges=False)
-    except Exception:
-        pass
 
 
 class SingleWorkerDocxService:
@@ -379,15 +326,14 @@ def default_engine_factory() -> DocumentEngine:
                 logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
                 saved = True
-                close_word_document(document)
-                document = None
-                hidden_run_count = remove_hidden_runs_from_docx(output_path)
-                logger.info("word: xml cleanup complete hidden_runs=%d", hidden_run_count)
             except Exception as exc:  # pragma: no cover - exercised on Windows host
                 raise DocumentProcessingError("Word failed while processing the document.") from exc
             finally:
                 if document is not None:
-                    close_word_document(document)
+                    try:
+                        document.Close(SaveChanges=False)
+                    except Exception:
+                        pass
                 if app is not None:
                     try:
                         app.Quit()

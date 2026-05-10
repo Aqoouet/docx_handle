@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import threading
-import zipfile
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from docx_handle.word_service import (
     SingleWorkerDocxService,
     clean_document,
     is_cross_reference_field,
-    remove_hidden_runs_from_docx,
     remove_hidden_text_from_ranges,
     unlink_cross_reference_fields,
 )
@@ -157,37 +154,6 @@ def test_clean_document_removes_hidden_crossref_text_from_field_result_before_un
     assert result["cross_reference_fields_unlinked"] == 1
     assert result["cross_reference_results_scanned_for_hidden_text"] == 1
     assert result["ranges_scanned_for_hidden_text"] == 1
-
-
-def test_remove_hidden_runs_from_docx_strips_vanish_runs():
-    document_xml = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        "<w:body><w:p>"
-        '<w:r><w:t xml:space="preserve">таблица </w:t></w:r>'
-        "<w:r><w:rPr><w:vanish/></w:rPr><w:t>Таблица </w:t></w:r>"
-        "<w:r><w:t>5.1</w:t></w:r>"
-        "<w:r><w:noBreakHyphen/></w:r><w:r><w:t>1</w:t></w:r>"
-        "</w:p></w:body></w:document>"
-    ).encode("utf-8")
-
-    with TemporaryDirectory() as temp_dir:
-        docx_path = Path(temp_dir) / "sample.docx"
-        with zipfile.ZipFile(docx_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr("[Content_Types].xml", "<Types/>")
-            archive.writestr("word/document.xml", document_xml)
-
-        removed = remove_hidden_runs_from_docx(docx_path)
-
-        with zipfile.ZipFile(docx_path) as archive:
-            rewritten = archive.read("word/document.xml").decode("utf-8")
-
-    assert removed == 1
-    assert "<w:vanish/>" not in rewritten
-    assert "Таблица " not in rewritten
-    assert 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in rewritten
-    assert "<w:noBreakHyphen/>" in rewritten
-    assert "<w:document" in rewritten
 
 
 class FakeEngine:
