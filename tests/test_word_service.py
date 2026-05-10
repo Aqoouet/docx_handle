@@ -6,10 +6,9 @@ from pathlib import Path
 from docx_handle.word_service import (
     SingleWorkerDocxService,
     clean_document,
-    collect_cross_reference_fields,
     is_cross_reference_field,
+    remove_hidden_text_from_cross_reference_results,
     remove_hidden_text_from_ranges,
-    unlink_cross_reference_fields,
 )
 
 
@@ -25,7 +24,6 @@ class FakeTextRetrievalMode:
 
 class FakeReplacement:
     def __init__(self):
-        self.Text = None
         self.Font = type("Font", (), {"Hidden": None})()
 
     def ClearFormatting(self) -> None:
@@ -63,56 +61,22 @@ class FakeRangeView:
         self.Find = owner.Find
         self.TextRetrievalMode = FakeTextRetrievalMode()
 
-    @property
-    def Text(self) -> str:
-        if self.TextRetrievalMode.IncludeHiddenText:
-            return self._owner.full_text
-        return self._owner.visible_text
-
-    @Text.setter
-    def Text(self, value: str) -> None:
-        self._owner.full_text = value
-        self._owner.visible_text = value
-        self._owner.last_replaced_text = value
-
     def Delete(self) -> int:  # noqa: N802
         return self._owner.Delete()
 
 
 class FakeRange:
-    def __init__(
-        self,
-        *,
-        visible_text: str = "",
-        full_text: str | None = None,
-        hidden_matches_remaining: int = 0,
-        fields=None,
-    ):
-        self.visible_text = visible_text
-        self.full_text = visible_text if full_text is None else full_text
+    def __init__(self, *, hidden_matches_remaining: int = 0, fields=None):
         self.hidden_matches_remaining = hidden_matches_remaining
         self.deleted_count = 0
-        self.last_replaced_text: str | None = None
         self.Find = FakeFind(self)
         self.TextRetrievalMode = FakeTextRetrievalMode()
-        self.Fields = list(fields or [])
+        self.Fields = fields
         self.NextStoryRange = None
 
     @property
     def Duplicate(self) -> FakeRangeView:  # noqa: N802
         return FakeRangeView(self)
-
-    @property
-    def Text(self) -> str:
-        if self.TextRetrievalMode.IncludeHiddenText:
-            return self.full_text
-        return self.visible_text
-
-    @Text.setter
-    def Text(self, value: str) -> None:
-        self.full_text = value
-        self.visible_text = value
-        self.last_replaced_text = value
 
     def Delete(self) -> int:  # noqa: N802
         if self.hidden_matches_remaining <= 0:
@@ -133,6 +97,18 @@ class FakeField:
         self.unlinked = True
 
 
+class FakeFieldsCollection:
+    def __init__(self, fields):
+        self._fields = list(fields)
+
+    @property
+    def Count(self) -> int:  # noqa: N802
+        return len(self._fields)
+
+    def __getitem__(self, index: int):
+        return self._fields[index - 1]
+
+
 class FakeDocument:
     def __init__(self, fields, ranges):
         self.Fields = fields
@@ -145,17 +121,6 @@ def test_cross_reference_detection_uses_field_code_or_type():
     assert is_cross_reference_field(FakeField("PAGEREF bookmark", field_type=999))
     assert is_cross_reference_field(FakeField("", field_type=72))
     assert not is_cross_reference_field(FakeField("DATE"))
-
-
-def test_unlink_cross_reference_fields_only_targets_crossrefs():
-    crossref = FakeField("REF bookmark")
-    plain = FakeField("DATE")
-
-    count = unlink_cross_reference_fields([crossref, plain])
-
-    assert count == 1
-    assert crossref.unlinked is True
-    assert plain.unlinked is False
 
 
 def test_remove_hidden_text_deletes_matches_instead_of_replace_all():
@@ -171,44 +136,60 @@ def test_remove_hidden_text_deletes_matches_instead_of_replace_all():
     assert cleanup_range.Find.execute_kwargs == {}
 
 
-def test_collect_cross_reference_fields_includes_story_range_fields():
-    story_field = FakeField("REF bookmark", result=FakeRange(visible_text="1", full_text="Таблица 1"))
-    story_range = FakeRange(fields=[story_field])
+def test_cross_reference_result_cleanup_deletes_hidden_text_without_unlinking():
+    result_range = FakeRange(hidden_matches_remaining=2)
+    field = FakeField("REF bookmark", result=result_range)
+    story_range = FakeRange(fields=FakeFieldsCollection([field]))
     document = FakeDocument([], [story_range])
 
-    fields = collect_cross_reference_fields(document)
+    cleaned = remove_hidden_text_from_cross_reference_results(document)
 
-    assert fields == (story_field,)
+    assert cleaned == 1
+    assert result_range.deleted_count == 2
+    assert field.unlinked is False
 
 
-def test_clean_document_rewrites_crossref_result_to_visible_text_before_unlink():
-    result_range = FakeRange(visible_text="2-1", full_text="Таблица 2-1")
-    field = FakeField("REF bookmark", result=result_range)
-    cleanup_range = FakeRange()
-    document = FakeDocument([field], [cleanup_range])
+def test_cross_reference_result_cleanup_ignores_non_cross_reference_fields():
+    result_range = FakeRange(hidden_matches_remaining=2)
+    field = FakeField("DATE", result=result_range)
+    story_range = FakeRange(fields=FakeFieldsCollection([field]))
+    document = FakeDocument([], [story_range])
+
+    cleaned = remove_hidden_text_from_cross_reference_results(document)
+
+    assert cleaned == 0
+    assert result_range.deleted_count == 0
+
+
+def test_cross_reference_result_cleanup_iterates_live_fields_in_reverse():
+    first = FakeField("REF first", result=FakeRange(hidden_matches_remaining=1))
+    second = FakeField("REF second", result=FakeRange(hidden_matches_remaining=1))
+    collection = FakeFieldsCollection([first, second])
+    story_range = FakeRange(fields=collection)
+    document = FakeDocument([], [story_range])
+
+    cleaned = remove_hidden_text_from_cross_reference_results(document)
+
+    assert cleaned == 2
+    assert first.Result.deleted_count == 1
+    assert second.Result.deleted_count == 1
+
+
+def test_clean_document_applies_story_and_cross_reference_cleanup_without_unlinking():
+    field_result = FakeRange(hidden_matches_remaining=1)
+    field = FakeField("REF bookmark", result=field_result)
+    cleanup_range = FakeRange(hidden_matches_remaining=2, fields=FakeFieldsCollection([field]))
+    document = FakeDocument([], [cleanup_range])
 
     result = clean_document(document)
 
-    assert field.unlinked is True
-    assert result_range.Text == "2-1"
-    assert result_range.last_replaced_text == "2-1"
-    assert result["cross_reference_fields_unlinked"] == 1
-    assert result["cross_reference_results_scanned_for_hidden_text"] == 1
-    assert result["cross_reference_results_rewritten"] == 1
-    assert result["ranges_scanned_for_hidden_text"] == 0
-
-
-def test_clean_document_leaves_crossref_result_unchanged_when_visible_and_full_match():
-    result_range = FakeRange(visible_text="3-1", full_text="3-1")
-    field = FakeField("REF bookmark", result=result_range)
-    document = FakeDocument([field], [FakeRange()])
-
-    result = clean_document(document)
-
-    assert field.unlinked is True
-    assert result_range.last_replaced_text is None
+    assert cleanup_range.deleted_count == 2
+    assert field_result.deleted_count == 1
+    assert field.unlinked is False
+    assert result["cross_reference_fields_unlinked"] == 0
     assert result["cross_reference_results_scanned_for_hidden_text"] == 1
     assert result["cross_reference_results_rewritten"] == 0
+    assert result["ranges_scanned_for_hidden_text"] == 2
 
 
 class FakeEngine:
