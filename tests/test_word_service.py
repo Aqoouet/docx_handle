@@ -185,7 +185,9 @@ def test_remove_hidden_runs_from_docx_strips_vanish_runs():
     assert removed == 1
     assert "<w:vanish/>" not in rewritten
     assert "Таблица " not in rewritten
-    assert "noBreakHyphen" in rewritten
+    assert 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' in rewritten
+    assert "<w:noBreakHyphen/>" in rewritten
+    assert "<w:document" in rewritten
 
 
 class FakeEngine:

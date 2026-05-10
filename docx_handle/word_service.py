@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import queue
+import re
 import logging
 import sys
 import threading
@@ -11,7 +12,6 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
-from xml.etree import ElementTree
 
 from .errors import DocumentProcessingError, WordAutomationUnavailableError
 
@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 WD_FIND_STOP = 0
 WD_REPLACE_ALL = 2
-WORDPROCESSINGML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WORDPROCESSINGML_PARTS = (
     "word/document.xml",
     "word/footnotes.xml",
     "word/endnotes.xml",
     "word/comments.xml",
+)
+HIDDEN_RUN_PATTERN = re.compile(
+    rb"<w:r\b[^>]*>.*?<w:rPr\b[^>]*>.*?<w:vanish\b(?:[^>]*/>|[^>]*>.*?</w:vanish>).*</w:rPr>.*?</w:r>",
+    re.DOTALL,
 )
 
 KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
@@ -46,10 +49,6 @@ class WordFieldLike(Protocol):
 
 class WordRangeLike(Protocol):
     Find: Any
-
-
-def _qn(local_name: str) -> str:
-    return f"{{{WORDPROCESSINGML_NAMESPACE}}}{local_name}"
 
 
 def _field_code_token(field: Any) -> str:
@@ -179,26 +178,7 @@ def clean_document(document: Any) -> dict[str, int]:
 
 
 def _remove_hidden_runs_from_xml(xml_bytes: bytes) -> tuple[bytes, int]:
-    root = ElementTree.fromstring(xml_bytes)
-    run_tag = _qn("r")
-    run_properties_tag = _qn("rPr")
-    vanish_tag = _qn("vanish")
-    hidden_run_count = 0
-
-    for parent in root.iter():
-        for child in list(parent):
-            if child.tag != run_tag:
-                continue
-            run_properties = child.find(run_properties_tag)
-            if run_properties is None:
-                continue
-            if run_properties.find(vanish_tag) is None:
-                continue
-            parent.remove(child)
-            hidden_run_count += 1
-
-    rewritten = ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
-    return rewritten, hidden_run_count
+    return HIDDEN_RUN_PATTERN.subn(b"", xml_bytes)
 
 
 def remove_hidden_runs_from_docx(docx_path: Path) -> int:
