@@ -10,10 +10,11 @@ Git remote:
 1. Make code changes on this local PC checkout first.
 2. Commit and push the changes to GitHub.
 3. On `ssh stressii-wg`, pull the latest code from GitHub:
-   ```bash
-   ssh stressii-wg "cd /filer/users/rymax1e/docx_handle && git pull"
-   ```
-4. Start the service on `stress11` from Linux (see **Service Launch** below).
+ ```bash
+ ssh stressii-wg "cd /filer/users/rymax1e/docx_handle && git pull"
+ ```
+4. **Stop here.** Ask the user to restart the service on `stress11` manually (see **Service Launch** below).
+   Service restart requires an interactive session and cannot be done programmatically.
 
 ## Shared Test Data
 
@@ -36,6 +37,10 @@ echo EzraNehemiah1950-1952>C:\Users\rymax1e\.share_pass
 ```bash
 ssh stress11 "C:\Users\rymax1e\docx_handle\scripts\ssh_start_service.cmd"
 ```
+
+> **Note:** Service restart on `stress11` only works from an interactive SSH session.
+> Do not attempt to restart via a non-interactive shell or background command — it will not work.
+> After a code update, stop at the `git pull` step and ask the user to restart the service manually.
 
 ### Start service — Cyrillic fix disabled (for testing)
 
