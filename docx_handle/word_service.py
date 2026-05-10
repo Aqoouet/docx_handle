@@ -22,19 +22,9 @@ KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
 KNOWN_CROSS_REFERENCE_TYPES = {3, 37, 72}
 
 
-
 class DocumentEngine(Protocol):
     def process(self, input_path: Path, output_path: Path) -> None:
         ...
-
-
-class WordFieldLike(Protocol):
-    Type: int
-    Code: Any
-
-
-class WordRangeLike(Protocol):
-    Find: Any
 
 
 def _field_code_token(field: Any) -> str:
@@ -122,12 +112,6 @@ def remove_hidden_text_from_ranges(ranges: Iterable[Any]) -> int:
     return cleaned
 
 
-def iter_cross_reference_fields(fields: Iterable[Any]) -> Iterable[Any]:
-    for field in fields:
-        if is_cross_reference_field(field):
-            yield field
-
-
 def iter_story_field_collections(document: Any) -> Iterable[Any]:
     seen: set[int] = set()
     for story_range in iter_word_cleanup_ranges(document):
@@ -182,13 +166,11 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 def clean_document(document: Any) -> dict[str, int]:
     # Delete hidden text inside each cross-reference field result (e.g. hidden
     # "Таблица " / "Рисунок " prefixes), then delete hidden text everywhere else.
-    cross_reference_hidden_text_count = remove_hidden_text_from_cross_reference_results(document)
-    hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
+    cross_refs_scanned = remove_hidden_text_from_cross_reference_results(document)
+    ranges_cleaned = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
     return {
-        "cross_reference_fields_unlinked": 0,
-        "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
-        "cross_reference_results_rewritten": 0,
-        "ranges_scanned_for_hidden_text": hidden_text_count,
+        "cross_reference_results_scanned": cross_refs_scanned,
+        "ranges_cleaned": ranges_cleaned,
     }
 
 
@@ -309,7 +291,6 @@ def default_engine_factory() -> DocumentEngine:
             pythoncom.CoInitialize()
             app = None
             document = None
-            saved = False
             try:
                 logger.info("word: creating Word.Application")
                 for creator in (
@@ -345,14 +326,12 @@ def default_engine_factory() -> DocumentEngine:
                 )
                 cleanup_stats = clean_document(document)
                 logger.info(
-                    "word: cleanup complete cross_refs=%d hidden_ranges=%d cross_ref_ranges=%d",
-                    cleanup_stats["cross_reference_fields_unlinked"],
-                    cleanup_stats["ranges_scanned_for_hidden_text"],
-                    cleanup_stats["cross_reference_results_scanned_for_hidden_text"],
+                    "word: cleanup complete cross_refs_scanned=%d ranges_cleaned=%d",
+                    cleanup_stats["cross_reference_results_scanned"],
+                    cleanup_stats["ranges_cleaned"],
                 )
                 logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
-                saved = True
             except Exception as exc:  # pragma: no cover - exercised on Windows host
                 raise DocumentProcessingError("Word failed while processing the document.") from exc
             finally:
