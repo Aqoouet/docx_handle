@@ -63,6 +63,39 @@ class FakeDocument:
         self.Content = ranges[0] if ranges else None
 
 
+class HiddenCrossRefState:
+    def __init__(self):
+        self.hidden_text_present = True
+        self.hidden_formatting_preserved = True
+
+
+class HiddenCrossRefField(FakeField):
+    def __init__(self, state: HiddenCrossRefState):
+        super().__init__("REF bookmark")
+        self._state = state
+
+    def Unlink(self) -> None:
+        super().Unlink()
+        self._state.hidden_formatting_preserved = False
+
+
+class HiddenCrossRefFind(FakeFind):
+    def __init__(self, state: HiddenCrossRefState):
+        super().__init__()
+        self._state = state
+
+    def Execute(self, **kwargs) -> None:  # noqa: N802
+        super().Execute(**kwargs)
+        if self._state.hidden_formatting_preserved:
+            self._state.hidden_text_present = False
+
+
+class HiddenCrossRefRange(FakeRange):
+    def __init__(self, state: HiddenCrossRefState):
+        self.Find = HiddenCrossRefFind(state)
+        self.NextStoryRange = None
+
+
 def test_cross_reference_detection_uses_field_code_or_type():
     assert is_cross_reference_field(FakeField(" REF bookmark \\h"))
     assert is_cross_reference_field(FakeField("PAGEREF bookmark", field_type=999))
@@ -105,6 +138,18 @@ def test_clean_document_applies_both_transformations():
     assert result["ranges_scanned_for_hidden_text"] == 1
 
 
+def test_clean_document_removes_hidden_crossref_text_before_unlink():
+    state = HiddenCrossRefState()
+    field = HiddenCrossRefField(state)
+    cleanup_range = HiddenCrossRefRange(state)
+    document = FakeDocument([field], [cleanup_range])
+
+    clean_document(document)
+
+    assert state.hidden_text_present is False
+    assert field.unlinked is True
+
+
 class FakeEngine:
     def __init__(self):
         self.calls = []
@@ -126,4 +171,3 @@ def test_single_worker_service_processes_requests_in_order():
     assert first == b"processed:one"
     assert second == b"processed:two"
     assert engine.calls == ["input.docx", "input.docx"]
-

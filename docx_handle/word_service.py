@@ -139,8 +139,8 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 
 def clean_document(document: Any) -> dict[str, int]:
     fields = getattr(document, "Fields", [])
-    cross_reference_count = unlink_cross_reference_fields(fields)
     hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
+    cross_reference_count = unlink_cross_reference_fields(fields)
     return {
         "cross_reference_fields_unlinked": cross_reference_count,
         "ranges_scanned_for_hidden_text": hidden_text_count,
