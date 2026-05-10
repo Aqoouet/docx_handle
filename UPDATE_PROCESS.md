@@ -28,3 +28,4 @@ Git remote:
 - Treat `/filer/users/rymax1e/...` and `\\e0-filer03\allcreatex\createx\rymax1e\storage` as the same shared storage, expressed in Linux and Windows path form.
 - The SSH start path on `stress11` should use `scripts\\run_service_share.cmd`; it maps a drive letter automatically and falls back across available letters.
 - Do not store share passwords in git. If the share prompts for credentials, enter them interactively in the SSH session when `net use` asks.
+- Runtime logs are written to `%TEMP%\\docx_handle_share_bootstrap.log` until the share is resolved, then to `%ROOT_DIR%\\logs\\service_share.log`.

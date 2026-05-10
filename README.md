@@ -74,6 +74,9 @@ scripts\run_service_share.cmd
 
 The launcher will try the preferred drive letter first and then fall back to other free letters.
 If the share needs a password, `net use` will prompt for it interactively.
+Startup details are written to:
+- `%TEMP%\docx_handle_share_bootstrap.log` before the share is resolved
+- `%ROOT_DIR%\logs\service_share.log` after the repo and venv are found
 
 ## Notes
 
