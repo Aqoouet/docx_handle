@@ -19,6 +19,8 @@ Git remote:
 1. `stress11` runs the COM-based preprocessing service and writes the updated DOCX into the shared `test_data` folder.
 2. `stressii-wg` uses the same shared `test_data` folder and runs `report_checking` Docling conversion on the updated DOCX to produce the Markdown file.
 
+See [RUNBOOK.md](RUNBOOK.md) for the exact start commands, full test flow, and log locations.
+
 ## Rules
 
 - Do not edit the live service tree first.

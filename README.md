@@ -78,6 +78,8 @@ Startup details are written to:
 - `%TEMP%\docx_handle_share_bootstrap.log` before the share is resolved
 - `%ROOT_DIR%\logs\service_share.log` after the repo and venv are found
 
+See [RUNBOOK.md](RUNBOOK.md) for the full start + test flow and log locations.
+
 ## Notes
 
 - The Word automation worker is single-threaded and processes one document at a time.
