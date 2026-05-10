@@ -114,6 +114,9 @@ class FakeFieldsCollection:
     def Count(self) -> int:  # noqa: N802
         return len(self._fields)
 
+    def __iter__(self):
+        return iter(self._fields)
+
     def __getitem__(self, index: int):
         return self._fields[index - 1]
 

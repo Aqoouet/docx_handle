@@ -176,11 +176,7 @@ def unhide_table_figure_prefixes_in_cross_reference_results(document: Any) -> in
     """
     total = 0
     for fields in iter_story_field_collections(document):
-        count = getattr(fields, "Count", 0)
-        if not isinstance(count, int):
-            continue
-        for index in range(count, 0, -1):
-            field = fields[index]
+        for field in fields:
             if not is_cross_reference_field(field):
                 continue
             result_range = getattr(field, "Result", None)
@@ -213,11 +209,7 @@ def iter_story_field_collections(document: Any) -> Iterable[Any]:
 def remove_hidden_text_from_cross_reference_results(document: Any) -> int:
     scanned = 0
     for fields in iter_story_field_collections(document):
-        count = getattr(fields, "Count", 0)
-        if not isinstance(count, int):
-            continue
-        for index in range(count, 0, -1):
-            field = fields[index]
+        for field in fields:
             if not is_cross_reference_field(field):
                 continue
             result_range = getattr(field, "Result", None)

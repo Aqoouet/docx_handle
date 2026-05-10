@@ -65,3 +65,4 @@ See [RUNBOOK.md](RUNBOOK.md) for the full test flow and log locations.
 - Launch the service from Linux using `scripts/ssh_start_service.cmd` — it maps `U:` automatically using `C:\Users\rymax1e\.share_pass` (not in git).
 - Do not store share passwords in git. The password file `.share_pass` lives only on `stress11`.
 - Runtime logs are written to `%TEMP%\\docx_handle_share_bootstrap.log` until the share is resolved, then to `%ROOT_DIR%\\logs\\service_share.log`.
+- Log files are accessible from Linux at `/filer/users/rymax1e/docx_handle/logs/` (same share, Linux path). Use `ssh stressii-wg "tail -n 100 /filer/users/rymax1e/docx_handle/logs/service_share.log"` to read them.
