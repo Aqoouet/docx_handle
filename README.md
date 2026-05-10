@@ -65,9 +65,17 @@ The service should be started from that directory with the local venv Python:
 .\.venv\Scripts\python.exe -m docx_handle.cli --host 0.0.0.0 --port 8000
 ```
 
+If you are starting from the shared Windows storage over SSH, use the share launcher:
+
+```bat
+set DOCX_HANDLE_DRIVE=U
+scripts\run_service_share.cmd
+```
+
+The launcher will try the preferred drive letter first and then fall back to other free letters.
+
 ## Notes
 
 - The Word automation worker is single-threaded and processes one document at a time.
 - Cross-reference detection is intentionally conservative and targets Word field codes such as `REF`, `PAGEREF`, and `NOTEREF`.
 - Hidden text removal uses Word's formatting search and replace, so the transformation depends on Word being available on the host.
-

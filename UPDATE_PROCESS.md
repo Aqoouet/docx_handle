@@ -12,6 +12,7 @@ Git remote:
 3. On `stressii-wg`, pull the latest code from GitHub when you need the remote checkout updated.
 4. On `stress11`, launch the service from the Windows share path:
    `\\e0-filer03\allcreatex\createx\rymax1e\storage`
+   or use `scripts\\run_service_share.cmd` after setting `DOCX_HANDLE_DRIVE` to a preferred letter such as `U`.
 
 ## Shared Test Data
 
@@ -25,3 +26,4 @@ Git remote:
 - Always verify the pushed commit is present on `stressii-wg` before starting the service on `stress11`.
 - For formula regression testing, use the shared `test_data` folder directly instead of copying the file between hosts.
 - Treat `/filer/users/rymax1e/...` and `\\e0-filer03\allcreatex\createx\rymax1e\storage` as the same shared storage, expressed in Linux and Windows path form.
+- The SSH start path on `stress11` should use `scripts\\run_service_share.cmd`; it maps a drive letter automatically and falls back across available letters.
