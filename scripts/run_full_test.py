@@ -85,11 +85,14 @@ def _remote_docling_convert(
         "print(f'Wrote {out}')\n"
         "print(f'MD bytes: {len(md.encode(\"utf-8\"))}')\n"
     )
+    docx_handle_root = str(linux_input_path.parents[1])
     remote_command = (
         f"cd {shlex.quote(report_checking_root)} && "
         "if [ -x backend/.venv/bin/python ]; then PYTHON=backend/.venv/bin/python; "
         "else PYTHON=python3; fi && "
-        f"DOCLING_URL=http://{docling_ip}:5001 \"$PYTHON\" -c {shlex.quote(python_code)}"
+        f"DOCLING_URL=http://{docling_ip}:5001 "
+        f"PYTHONPATH={shlex.quote(docx_handle_root)}:$PYTHONPATH "
+        f"\"$PYTHON\" -c {shlex.quote(python_code)}"
     )
 
     print(f"[remote] converting via docling at {docling_ip}:5001")
