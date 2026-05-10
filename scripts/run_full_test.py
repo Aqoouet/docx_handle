@@ -132,6 +132,11 @@ def main() -> int:
         default="stressii-wg",
         help="SSH host for the remote Docling conversion step (hostname or IP).",
     )
+    parser.add_argument(
+        "--skip-docling",
+        action="store_true",
+        help="Skip the remote Docling conversion step (run preprocessing only).",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -142,6 +147,12 @@ def main() -> int:
     markdown_path = input_path.with_name(f"{input_path.stem}_preprocessed.md")
 
     _request_convert(args.service_host, args.service_port, input_path, preprocessed_path)
+
+    if args.skip_docling:
+        print("[done] preprocessing complete (Docling step skipped)")
+        print(f"[done] preprocessed DOCX: {preprocessed_path}")
+        print("[done] run remote_docling_convert.sh on stressii-wg for the MD conversion")
+        return 0
 
     linux_root = Path(args.linux_shared_root)
     linux_input = linux_root / preprocessed_path.name
