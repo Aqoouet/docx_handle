@@ -122,6 +122,34 @@ _DOCLING_BROKEN_MACROS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\\text\{\s*\\textellipsis\s*\}"), r"\\ldots"),
 ]
 
+# Reverse map: \cyrX macro name → actual Cyrillic Unicode character
+_CYRILLIC_MACRO_TO_UNICODE: dict[str, str] = {
+    "cyra": "а", "cyrb": "б", "cyrv": "в", "cyrg": "г", "cyrd": "д",
+    "cyre": "е", "cyryo": "ё", "cyrzh": "ж", "cyrz": "з", "cyri": "и",
+    "cyrishrt": "й", "cyrk": "к", "cyrl": "л", "cyrm": "м", "cyrn": "н",
+    "cyro": "о", "cyrp": "п", "cyrr": "р", "cyrs": "с", "cyrt": "т",
+    "cyru": "у", "cyrf": "ф", "cyrkh": "х", "cyrts": "ц", "cyrch": "ч",
+    "cyrsh": "ш", "cyrshch": "щ", "cyrery": "ы", "cyrsoftsign": "ь",
+    "cyrhrdsn": "ъ", "cyrhard": "ъ", "cyrh": "х", "cyrc": "ц",
+    "cyryu": "ю", "cyrya": "я",
+    "CYRA": "А", "CYRB": "Б", "CYRV": "В", "CYRG": "Г", "CYRD": "Д",
+    "CYRE": "Е", "CYRYO": "Ё", "CYRZH": "Ж", "CYRZ": "З", "CYRI": "И",
+    "CYRISHRT": "Й", "CYRK": "К", "CYRL": "Л", "CYRM": "М", "CYRN": "Н",
+    "CYRO": "О", "CYRP": "П", "CYRR": "Р", "CYRS": "С", "CYRT": "Т",
+    "CYRU": "У", "CYRF": "Ф", "CYRKH": "Х", "CYRTS": "Ц", "CYRCH": "Ч",
+    "CYRSH": "Ш", "CYRSHCH": "Щ", "CYRERY": "Ы", "CYRSOFTSIGN": "Ь",
+    "CYRHRDSN": "Ъ", "CYRHARD": "Ъ", "CYRH": "Х", "CYRC": "Ц",
+    "CYRYU": "Ю", "CYRYA": "Я",
+}
+
+_CYR_MACRO_NAMES = "|".join(
+    sorted(map(re.escape, _CYRILLIC_MACRO_TO_UNICODE), key=len, reverse=True)
+)
+# Matches one or more consecutive \cyrX tokens (with optional spaces between them)
+_CYR_RUN_RE = re.compile(
+    r"(?:\\(?:" + _CYR_MACRO_NAMES + r")\s*)+"
+)
+
 _CYRILLIC_MACRO_RE = re.compile(
     r"\\(?P<macro>"
     + "|".join(sorted(map(re.escape, CYRILLIC_MACRO_TRANSLITERATION.keys()), key=len, reverse=True))
@@ -149,7 +177,18 @@ def fix_docling_latex(md: str) -> str:
     """Replace broken LaTeX macros emitted by Docling for certain Unicode math chars."""
     for pattern, replacement in _DOCLING_BROKEN_MACROS:
         md = pattern.sub(replacement, md)
+    md = _CYR_RUN_RE.sub(_cyr_run_to_text, md)
     return md
+
+
+def _cyr_run_to_text(match: re.Match[str]) -> str:
+    """Convert a run of \\cyrX macros to \\text{Cyrillic unicode}."""
+    single = re.compile(r"\\(" + _CYR_MACRO_NAMES + r")\s*")
+    chars = "".join(
+        _CYRILLIC_MACRO_TO_UNICODE.get(m.group(1), m.group(1))
+        for m in single.finditer(match.group(0))
+    )
+    return r"\text{" + chars + "}"
 
 
 def normalize_docx_math_cyrillic(docx_path: Path) -> int:
