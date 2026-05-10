@@ -28,13 +28,22 @@ Source DOCX:
 
 `U:\docx_handle\test_data\A320_ESG-855_01-SR_Part14_MSN05031_TH-003999231_template_v2_1.docx`
 
-Full flow:
-
 1. Start `docx_handle` on `stress11` using the command above.
-2. Send the DOCX to `http://127.0.0.1:8000/convert`.
-3. Save the returned updated DOCX into the shared `test_data` folder.
-4. On `stressii-wg`, run `report_checking` Docling conversion against that updated DOCX.
-5. Save the resulting Markdown into the same `test_data` folder.
+
+Then run the automated full test from the same interactive shell:
+
+```bat
+call scripts\run_full_test.cmd
+```
+
+What it does:
+
+1. Sends the DOCX to `http://127.0.0.1:8000/convert`.
+2. Saves the returned updated DOCX into the shared `test_data` folder.
+3. SSHes to `stressii-wg`.
+4. Resolves the Docling container IP.
+5. Runs the `report_checking` Docling conversion.
+6. Writes the resulting Markdown into the same shared `test_data` folder.
 
 The output Markdown file should live next to the DOCX, for example:
 
@@ -49,6 +58,10 @@ Launcher/bootstrap log:
 Service log:
 
 `C:\Users\rymax1e\docx_handle\logs\service_share.log`
+
+Full test log:
+
+`C:\Users\rymax1e\docx_handle\logs\full_test.log`
 
 If the service is started from another repo root, the log is still written under that root's `logs` folder.
 

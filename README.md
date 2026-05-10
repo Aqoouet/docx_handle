@@ -78,6 +78,14 @@ Startup details are written to:
 - `%TEMP%\docx_handle_share_bootstrap.log` before the share is resolved
 - `%ROOT_DIR%\logs\service_share.log` after the repo and venv are found
 
+To run the full preprocess + Docling test after the service is already up:
+
+```bat
+scripts\run_full_test.cmd
+```
+
+That writes its console log to `%ROOT_DIR%\logs\full_test.log`.
+
 See [RUNBOOK.md](RUNBOOK.md) for the full start + test flow and log locations.
 
 ## Notes
