@@ -239,7 +239,7 @@ def _safe_suffix(filename: str) -> str:
     return suffix if suffix == ".docx" else ".docx"
 
 
-def default_engine_factory() -> DocumentEngine:
+def default_engine_factory(fix_cyr: bool = True) -> DocumentEngine:
     if os.name == "nt":
         scripts_dir = Path(sys.executable).resolve().parent
         if scripts_dir.exists():
@@ -323,16 +323,18 @@ def default_engine_factory() -> DocumentEngine:
                         pass
                 pythoncom.CoUninitialize()
 
-            if saved:
+            if saved and fix_cyr:
                 try:
-                    logger.info("word: normalizing math text in %s", output_path.name)
+                    logger.info("word: normalizing math cyrillic in %s", output_path.name)
                     normalize_docx_math_cyrillic(output_path)
                     logger.info("word: normalization complete for %s", output_path.name)
                 except Exception as exc:  # pragma: no cover - exercised on Windows host
                     raise DocumentProcessingError("Word failed while normalizing formula text.") from exc
+            elif saved:
+                logger.info("word: cyr-fix disabled, skipping math cyrillic normalization for %s", output_path.name)
 
     return _ComWordEngine()
 
 
-def build_processor() -> SingleWorkerDocxService:
-    return SingleWorkerDocxService(default_engine_factory)
+def build_processor(fix_cyr: bool = True) -> SingleWorkerDocxService:
+    return SingleWorkerDocxService(lambda: default_engine_factory(fix_cyr=fix_cyr))
