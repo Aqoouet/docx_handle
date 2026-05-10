@@ -231,6 +231,13 @@ def remove_hidden_runs_from_docx(docx_path: Path) -> int:
     return hidden_run_count
 
 
+def close_word_document(document: Any) -> None:
+    try:
+        document.Close(SaveChanges=False)
+    except Exception:
+        pass
+
+
 class SingleWorkerDocxService:
     def __init__(self, engine_factory: Callable[[], DocumentEngine]):
         self._engine_factory = engine_factory
@@ -392,16 +399,15 @@ def default_engine_factory() -> DocumentEngine:
                 logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
                 saved = True
+                close_word_document(document)
+                document = None
                 hidden_run_count = remove_hidden_runs_from_docx(output_path)
                 logger.info("word: xml cleanup complete hidden_runs=%d", hidden_run_count)
             except Exception as exc:  # pragma: no cover - exercised on Windows host
                 raise DocumentProcessingError("Word failed while processing the document.") from exc
             finally:
                 if document is not None:
-                    try:
-                        document.Close(SaveChanges=False)
-                    except Exception:
-                        pass
+                    close_word_document(document)
                 if app is not None:
                     try:
                         app.Quit()
