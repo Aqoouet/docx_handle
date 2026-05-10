@@ -28,9 +28,10 @@ cd "$REPORT_CHECKING_ROOT"
 DOCLING_URL="http://$DOCLING_IP:5001" "$PYTHON" - <<EOF
 from pathlib import Path
 from backend.app.docling_client import convert_file_to_md
+from docx_handle.formula_normalizer import fix_docling_latex
 src = Path("$INPUT_PATH")
 out = Path("$OUTPUT_PATH")
-md = convert_file_to_md(str(src))
+md = fix_docling_latex(convert_file_to_md(str(src)))
 out.write_text(md, encoding="utf-8")
 print(f"Wrote {out}")
 print(f"MD bytes: {len(md.encode('utf-8'))}")

@@ -117,6 +117,11 @@ CYRILLIC_MACRO_TRANSLITERATION = {
 }
 CYRILLIC_MACRO_TRANSLITERATION.update({name.upper(): value.upper() for name, value in CYRILLIC_MACRO_TRANSLITERATION.items() if value})
 
+_DOCLING_BROKEN_MACROS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\\text\{\s*\\texttimes\s*\}"), r"\\times"),
+    (re.compile(r"\\text\{\s*\\textellipsis\s*\}"), r"\\ldots"),
+]
+
 _CYRILLIC_MACRO_RE = re.compile(
     r"\\(?P<macro>"
     + "|".join(sorted(map(re.escape, CYRILLIC_MACRO_TRANSLITERATION.keys()), key=len, reverse=True))
@@ -138,6 +143,13 @@ def normalize_formula_text(text: str) -> str:
     text = _SPACE_BEFORE_CLOSE_RE.sub(r"\1", text)
     text = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", text)
     return text
+
+
+def fix_docling_latex(md: str) -> str:
+    """Replace broken LaTeX macros emitted by Docling for certain Unicode math chars."""
+    for pattern, replacement in _DOCLING_BROKEN_MACROS:
+        md = pattern.sub(replacement, md)
+    return md
 
 
 def normalize_docx_math_cyrillic(docx_path: Path) -> int:
