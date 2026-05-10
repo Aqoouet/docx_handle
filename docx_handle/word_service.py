@@ -7,9 +7,11 @@ import sys
 import threading
 import tempfile
 import traceback
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
+from xml.etree import ElementTree
 
 from .errors import DocumentProcessingError, WordAutomationUnavailableError
 
@@ -17,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 WD_FIND_STOP = 0
 WD_REPLACE_ALL = 2
+WORDPROCESSINGML_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+WORDPROCESSINGML_PARTS = (
+    "word/document.xml",
+    "word/footnotes.xml",
+    "word/endnotes.xml",
+    "word/comments.xml",
+)
 
 KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
 KNOWN_CROSS_REFERENCE_TYPES = {3, 37, 72}
@@ -37,6 +46,10 @@ class WordFieldLike(Protocol):
 
 class WordRangeLike(Protocol):
     Find: Any
+
+
+def _qn(local_name: str) -> str:
+    return f"{{{WORDPROCESSINGML_NAMESPACE}}}{local_name}"
 
 
 def _field_code_token(field: Any) -> str:
@@ -163,6 +176,59 @@ def clean_document(document: Any) -> dict[str, int]:
         "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
         "ranges_scanned_for_hidden_text": hidden_text_count,
     }
+
+
+def _remove_hidden_runs_from_xml(xml_bytes: bytes) -> tuple[bytes, int]:
+    root = ElementTree.fromstring(xml_bytes)
+    run_tag = _qn("r")
+    run_properties_tag = _qn("rPr")
+    vanish_tag = _qn("vanish")
+    hidden_run_count = 0
+
+    for parent in root.iter():
+        for child in list(parent):
+            if child.tag != run_tag:
+                continue
+            run_properties = child.find(run_properties_tag)
+            if run_properties is None:
+                continue
+            if run_properties.find(vanish_tag) is None:
+                continue
+            parent.remove(child)
+            hidden_run_count += 1
+
+    rewritten = ElementTree.tostring(root, encoding="utf-8", xml_declaration=True)
+    return rewritten, hidden_run_count
+
+
+def remove_hidden_runs_from_docx(docx_path: Path) -> int:
+    hidden_run_count = 0
+    temp_path = docx_path.with_suffix(f"{docx_path.suffix}.tmp")
+    try:
+        with zipfile.ZipFile(docx_path, "r") as source, zipfile.ZipFile(
+            temp_path, "w", compression=zipfile.ZIP_DEFLATED
+        ) as target:
+            for info in source.infolist():
+                payload = source.read(info.filename)
+                if info.filename in WORDPROCESSINGML_PARTS:
+                    payload, removed = _remove_hidden_runs_from_xml(payload)
+                    hidden_run_count += removed
+
+                clone = zipfile.ZipInfo(info.filename)
+                clone.date_time = info.date_time
+                clone.compress_type = zipfile.ZIP_DEFLATED
+                clone.comment = info.comment
+                clone.extra = info.extra
+                clone.internal_attr = info.internal_attr
+                clone.external_attr = info.external_attr
+                clone.create_system = info.create_system
+                clone.flag_bits = info.flag_bits
+                target.writestr(clone, payload)
+        temp_path.replace(docx_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+    return hidden_run_count
 
 
 class SingleWorkerDocxService:
@@ -326,6 +392,8 @@ def default_engine_factory() -> DocumentEngine:
                 logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
                 saved = True
+                hidden_run_count = remove_hidden_runs_from_docx(output_path)
+                logger.info("word: xml cleanup complete hidden_runs=%d", hidden_run_count)
             except Exception as exc:  # pragma: no cover - exercised on Windows host
                 raise DocumentProcessingError("Word failed while processing the document.") from exc
             finally:
