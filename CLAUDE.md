@@ -9,15 +9,13 @@ Git remote:
 
 1. Make code changes on this local PC checkout first.
 2. Commit and push the changes to GitHub.
-3. On `stressii-wg`, pull the latest code from GitHub when you need the remote checkout updated.
-4. On `stress11`, launch the service from the Windows share path:
-   `\\e0-filer03\allcreatex\createx\rymax1e\storage`
-   or use `scripts\\run_service_share.cmd` after setting `DOCX_HANDLE_DRIVE` to a preferred letter such as `U`.
+3. On `ssh stressii-wg`, pull the latest code from GitHub when you need the remote checkout updated. Here the working dir is /filer/users/rymax1e/docx_handle
+4. On `ssh stress11`, launch the service from the Windows in interactive mode. use `scripts\\run_service_share.cmd`
 
 ## Shared Test Data
 
-1. `stress11` runs the COM-based preprocessing service and writes the updated DOCX into the shared `test_data` folder.
-2. `stressii-wg` uses the same shared `test_data` folder and runs `report_checking` Docling conversion on the updated DOCX to produce the Markdown file.
+1. `ssh stress11` runs the COM-based preprocessing service and writes the updated DOCX into the shared `test_data` folder.
+2. `ssh stressii-wg` uses the same shared `test_data` folder and runs `report_checking` Docling conversion on the updated DOCX to produce the Markdown file.
 
 See [RUNBOOK.md](RUNBOOK.md) for the exact start commands, full test flow, and log locations.
 

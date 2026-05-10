@@ -105,7 +105,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the full DOCX preprocessing + Docling conversion test.")
     parser.add_argument(
         "--input",
-        default=str(REPO_ROOT / "test_data" / "A320_ESG-855_01-SR_Part14_MSN05031_TH-003999231_template_v2_1.docx"),
+        default=str(REPO_ROOT / "test_data" / "test.docx"),
         help="Input DOCX path for the local preprocessing service.",
     )
     parser.add_argument("--service-host", default="127.0.0.1", help="docx_handle service host.")
