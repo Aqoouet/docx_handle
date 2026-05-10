@@ -16,7 +16,7 @@ from .errors import DocumentProcessingError, WordAutomationUnavailableError
 logger = logging.getLogger(__name__)
 
 WD_FIND_STOP = 0
-WD_REPLACE_ALL = 2
+MAX_HIDDEN_DELETES_PER_RANGE = 1000
 
 KNOWN_CROSS_REFERENCE_CODES = {"REF", "PAGEREF", "NOTEREF"}
 KNOWN_CROSS_REFERENCE_TYPES = {3, 37, 72}
@@ -58,8 +58,11 @@ def is_cross_reference_field(field: Any) -> bool:
 def unlink_cross_reference_fields(fields: Iterable[Any]) -> int:
     count = 0
     for field in fields:
+        if getattr(field, "_docx_handle_unlinked", False):
+            continue
         if is_cross_reference_field(field):
             field.Unlink()
+            _mark_internal(field, "_docx_handle_unlinked", True)
             count += 1
     return count
 
@@ -78,10 +81,40 @@ def _safe_set(obj: Any, attr: str, value: Any) -> None:
             pass
 
 
+def _mark_internal(obj: Any, attr: str, value: Any) -> None:
+    try:
+        setattr(obj, attr, value)
+    except Exception:
+        pass
+
+
+def _safe_get_text_retrieval_mode(word_range: Any) -> Any | None:
+    return getattr(word_range, "TextRetrievalMode", None)
+
+
+def _set_include_hidden_text(word_range: Any, include: bool) -> None:
+    text_retrieval_mode = _safe_get_text_retrieval_mode(word_range)
+    if text_retrieval_mode is not None:
+        _safe_set(text_retrieval_mode, "IncludeHiddenText", include)
+
+
+def _range_text(word_range: Any, include_hidden: bool) -> str:
+    probe = getattr(word_range, "Duplicate", word_range)
+    _set_include_hidden_text(probe, include_hidden)
+    text = getattr(probe, "Text", "")
+    return text if isinstance(text, str) else ""
+
+
+def _replace_range_text(word_range: Any, text: str) -> None:
+    _safe_set(word_range, "Text", text)
+
+
 def remove_hidden_text_from_ranges(ranges: Iterable[Any]) -> int:
     cleaned = 0
     for word_range in ranges:
-        find = getattr(word_range, "Find", None)
+        search_range = getattr(word_range, "Duplicate", word_range)
+        _set_include_hidden_text(search_range, True)
+        find = getattr(search_range, "Find", None)
         if find is None:
             continue
 
@@ -103,13 +136,21 @@ def remove_hidden_text_from_ranges(ranges: Iterable[Any]) -> int:
         replacement = getattr(find, "Replacement", None)
         if replacement is not None:
             _safe_call(replacement, "ClearFormatting")
-            _safe_set(replacement, "Text", "")
             replacement_font = getattr(replacement, "Font", None)
             if replacement_font is not None:
                 _safe_set(replacement_font, "Hidden", False)
 
-        _safe_call(find, "Execute", Replace=WD_REPLACE_ALL)
-        cleaned += 1
+        deletes = 0
+        while deletes < MAX_HIDDEN_DELETES_PER_RANGE:
+            found = getattr(find, "Execute", lambda **kwargs: False)()
+            if not found:
+                break
+            delete = getattr(search_range, "Delete", None)
+            removed = delete() if callable(delete) else 0
+            if removed == 0:
+                break
+            deletes += 1
+        cleaned += deletes
     return cleaned
 
 
@@ -119,14 +160,47 @@ def iter_cross_reference_fields(fields: Iterable[Any]) -> Iterable[Any]:
             yield field
 
 
-def remove_hidden_text_from_cross_reference_results(fields: Iterable[Any]) -> int:
-    cleaned = 0
+def collect_cross_reference_fields(document: Any) -> tuple[Any, ...]:
+    seen: set[int] = set()
+    collected: list[Any] = []
+
+    def add_fields(fields: Iterable[Any]) -> None:
+        for field in iter_cross_reference_fields(fields):
+            marker = id(field)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            collected.append(field)
+
+    add_fields(getattr(document, "Fields", []))
+    for story_range in iter_word_cleanup_ranges(document):
+        story_fields = getattr(story_range, "Fields", None)
+        if story_fields is not None:
+            add_fields(story_fields)
+    return tuple(collected)
+
+
+def normalize_cross_reference_results(fields: Iterable[Any]) -> tuple[int, int, int]:
+    scanned = 0
+    rewritten = 0
+    unlinked = 0
     for field in fields:
         result_range = getattr(field, "Result", None)
         if result_range is None:
             continue
-        cleaned += remove_hidden_text_from_ranges([result_range])
-    return cleaned
+
+        scanned += 1
+        visible_text = _range_text(result_range, include_hidden=False)
+        full_text = _range_text(result_range, include_hidden=True)
+        if visible_text == full_text:
+            continue
+
+        field.Unlink()
+        _mark_internal(field, "_docx_handle_unlinked", True)
+        unlinked += 1
+        _replace_range_text(result_range, visible_text)
+        rewritten += 1
+    return scanned, rewritten, unlinked
 
 
 def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
@@ -154,13 +228,16 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 
 
 def clean_document(document: Any) -> dict[str, int]:
-    fields = tuple(iter_cross_reference_fields(getattr(document, "Fields", [])))
+    fields = collect_cross_reference_fields(document)
     hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
-    cross_reference_hidden_text_count = remove_hidden_text_from_cross_reference_results(fields)
-    cross_reference_count = unlink_cross_reference_fields(fields)
+    cross_reference_hidden_text_count, cross_reference_rewritten_count, normalized_unlinked_count = (
+        normalize_cross_reference_results(fields)
+    )
+    cross_reference_count = normalized_unlinked_count + unlink_cross_reference_fields(fields)
     return {
         "cross_reference_fields_unlinked": cross_reference_count,
         "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
+        "cross_reference_results_rewritten": cross_reference_rewritten_count,
         "ranges_scanned_for_hidden_text": hidden_text_count,
     }
 
