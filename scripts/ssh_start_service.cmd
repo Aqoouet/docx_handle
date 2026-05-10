@@ -23,11 +23,20 @@ if /i "%DOCX_HANDLE_NO_CYR_FIX%"=="true" set "CYR_ARG=--no-cyr-fix"
 if exist "%PREFERRED_DRIVE%:\%SERVICE_DIR%\docx_handle\cli.py" (
     echo [ssh_start] Drive %PREFERRED_DRIVE%: already mapped
 ) else (
-    echo [ssh_start] Mapping %PREFERRED_DRIVE%: from stored credentials ...
-    net use %PREFERRED_DRIVE%: "%SHARE%" /persistent:no >nul 2>&1
+    echo [ssh_start] Mapping %PREFERRED_DRIVE%: ...
+    set "SHARE_PASS="
+    set "PASS_FILE=%USERPROFILE%\.share_pass"
+    if exist "%PASS_FILE%" (
+        set /p SHARE_PASS=<"%PASS_FILE%"
+    )
+    if defined SHARE_PASS (
+        net use %PREFERRED_DRIVE%: "%SHARE%" /user:rymax1e "%SHARE_PASS%" /persistent:no >nul 2>&1
+    ) else (
+        net use %PREFERRED_DRIVE%: "%SHARE%" /persistent:no >nul 2>&1
+    )
     if errorlevel 1 (
-        echo [ssh_start] ERROR: failed to map %PREFERRED_DRIVE%: - run once interactively:
-        echo   cmdkey /add:e0-filer03 /user:rymax1e /pass:YOUR_PASSWORD
+        echo [ssh_start] ERROR: failed to map %PREFERRED_DRIVE%:
+        echo   Create %USERPROFILE%\.share_pass with the share password on one line.
         exit /b 1
     )
     echo [ssh_start] Drive %PREFERRED_DRIVE%: mapped OK
