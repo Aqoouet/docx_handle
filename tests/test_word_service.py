@@ -18,9 +18,10 @@ class FakeCode:
 
 
 class FakeField:
-    def __init__(self, text: str, field_type: int = 0):
+    def __init__(self, text: str, field_type: int = 0, result=None):
         self.Code = FakeCode(text)
         self.Type = field_type
+        self.Result = result
         self.unlinked = False
 
     def Unlink(self) -> None:
@@ -71,7 +72,7 @@ class HiddenCrossRefState:
 
 class HiddenCrossRefField(FakeField):
     def __init__(self, state: HiddenCrossRefState):
-        super().__init__("REF bookmark")
+        super().__init__("REF bookmark", result=HiddenCrossRefRange(state))
         self._state = state
 
     def Unlink(self) -> None:
@@ -135,19 +136,24 @@ def test_clean_document_applies_both_transformations():
     assert field.unlinked is True
     assert cleanup_range.Find.executed is True
     assert result["cross_reference_fields_unlinked"] == 1
+    assert result["cross_reference_results_scanned_for_hidden_text"] == 0
     assert result["ranges_scanned_for_hidden_text"] == 1
 
 
-def test_clean_document_removes_hidden_crossref_text_before_unlink():
+def test_clean_document_removes_hidden_crossref_text_from_field_result_before_unlink():
     state = HiddenCrossRefState()
     field = HiddenCrossRefField(state)
-    cleanup_range = HiddenCrossRefRange(state)
+    cleanup_range = FakeRange()
     document = FakeDocument([field], [cleanup_range])
 
-    clean_document(document)
+    result = clean_document(document)
 
+    assert cleanup_range.Find.executed is True
     assert state.hidden_text_present is False
     assert field.unlinked is True
+    assert result["cross_reference_fields_unlinked"] == 1
+    assert result["cross_reference_results_scanned_for_hidden_text"] == 1
+    assert result["ranges_scanned_for_hidden_text"] == 1
 
 
 class FakeEngine:

@@ -113,6 +113,22 @@ def remove_hidden_text_from_ranges(ranges: Iterable[Any]) -> int:
     return cleaned
 
 
+def iter_cross_reference_fields(fields: Iterable[Any]) -> Iterable[Any]:
+    for field in fields:
+        if is_cross_reference_field(field):
+            yield field
+
+
+def remove_hidden_text_from_cross_reference_results(fields: Iterable[Any]) -> int:
+    cleaned = 0
+    for field in fields:
+        result_range = getattr(field, "Result", None)
+        if result_range is None:
+            continue
+        cleaned += remove_hidden_text_from_ranges([result_range])
+    return cleaned
+
+
 def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
     seen: set[int] = set()
     story_ranges = getattr(document, "StoryRanges", None)
@@ -138,11 +154,13 @@ def iter_word_cleanup_ranges(document: Any) -> Iterable[Any]:
 
 
 def clean_document(document: Any) -> dict[str, int]:
-    fields = getattr(document, "Fields", [])
+    fields = tuple(iter_cross_reference_fields(getattr(document, "Fields", [])))
     hidden_text_count = remove_hidden_text_from_ranges(iter_word_cleanup_ranges(document))
+    cross_reference_hidden_text_count = remove_hidden_text_from_cross_reference_results(fields)
     cross_reference_count = unlink_cross_reference_fields(fields)
     return {
         "cross_reference_fields_unlinked": cross_reference_count,
+        "cross_reference_results_scanned_for_hidden_text": cross_reference_hidden_text_count,
         "ranges_scanned_for_hidden_text": hidden_text_count,
     }
 
@@ -300,9 +318,10 @@ def default_engine_factory() -> DocumentEngine:
                 )
                 cleanup_stats = clean_document(document)
                 logger.info(
-                    "word: cleanup complete cross_refs=%d hidden_ranges=%d",
+                    "word: cleanup complete cross_refs=%d hidden_ranges=%d cross_ref_ranges=%d",
                     cleanup_stats["cross_reference_fields_unlinked"],
                     cleanup_stats["ranges_scanned_for_hidden_text"],
+                    cleanup_stats["cross_reference_results_scanned_for_hidden_text"],
                 )
                 logger.info("word: saving to %s", output_path)
                 document.SaveAs2(FileName=str(output_path), FileFormat=16)
